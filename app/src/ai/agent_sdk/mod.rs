@@ -881,6 +881,15 @@ impl AgentDriverRunner {
             setup_events
                 .post_timeline_event(OzRunTimelineEvent::WorkerContainerReady)
                 .await;
+            if args.require_execution_config
+                && (!FeatureFlag::CloudAgentExecutionConfig.is_enabled()
+                    || args.task_id.is_none()
+                    || args.execution_id.is_none())
+            {
+                return Err(AgentDriverError::ConfigBuildFailed(anyhow::anyhow!(
+                    "unsupported benchmark deferred repository preparation: execution bootstrap is required"
+                )));
+            }
             let execution_data = if FeatureFlag::CloudAgentExecutionConfig.is_enabled()
                 && let (Some(task_id), Some(execution_id)) =
                     (args.task_id.as_deref(), args.execution_id.as_deref())

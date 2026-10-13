@@ -28,6 +28,18 @@ use super::super::environment_checkout_protocol::{
 use super::{CachedCheckout, attempt_cached_checkout};
 use super::{Git, capture, mirror_key, optional_mirror_root, run};
 #[test]
+fn checkout_upload_locator_rejects_missing_or_unsafe_identifiers() {
+    let uid = uuid::Uuid::new_v4();
+    let uploaded = serde_json::json!({"artifact_uid": uid, "filepath": "sensitive", "description": "untrusted"});
+    assert_eq!(
+        super::checkout_report_artifact_locator(&serde_json::to_vec(&uploaded).unwrap()).unwrap(),
+        serde_json::json!({"checkout_report_artifact_uid": uid}).to_string()
+    );
+    for invalid in [b"{}".as_slice(), br#"{"artifact_uid":"uid\ninjected"}"#] {
+        assert!(super::checkout_report_artifact_locator(invalid).is_err());
+    }
+}
+#[test]
 fn strict_checkout_preserves_existing_work_and_reports_partial_success() {
     fixture_test(
         "strict_checkout_preserves_existing_work_and_reports_partial_success",
