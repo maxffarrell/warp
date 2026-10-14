@@ -878,25 +878,33 @@ fn builtin_mcp_servers_are_deferred_only_for_standby() {
             AuthStateProvider::as_ref(ctx)
                 .get()
                 .set_credentials(Some(api_key_credentials()));
+            // Use a fixed token so the host's workload credentials cannot change the test result.
+            ServerApiProvider::as_ref(ctx)
+                .get()
+                .set_ambient_workload_token_for_test("test-workload-token".to_string(), None);
         });
         let driver_handle = setup_agent_driver(&mut app);
         let foreground = driver_handle.update(&mut app, |_, ctx| ctx.spawner());
 
-        let mut installations = Vec::new();
-        attach_builtin_mcp_servers(
-            McpStartupMode::Standby,
-            None,
-            &[],
-            &mut installations,
-            &foreground,
-        )
-        .await
-        .unwrap();
-        assert!(installations.is_empty());
-
         let task_id: AmbientAgentTaskId = "550e8400-e29b-41d4-a716-446655440014".parse().unwrap();
-        for task_id in [None, Some(task_id)] {
-            installations.clear();
+        for (task_id, expected_names) in [
+            (None, vec![FACTORY_MCP_SERVER_NAME]),
+            (
+                Some(task_id),
+                vec![FACTORY_MCP_SERVER_NAME, PREVIEW_URLS_MCP_SERVER_NAME],
+            ),
+        ] {
+            let mut installations = Vec::new();
+            attach_builtin_mcp_servers(
+                McpStartupMode::Standby,
+                task_id,
+                &[],
+                &mut installations,
+                &foreground,
+            )
+            .await
+            .unwrap();
+            assert!(installations.is_empty());
             attach_builtin_mcp_servers(
                 McpStartupMode::Run,
                 task_id,
@@ -911,7 +919,7 @@ fn builtin_mcp_servers_are_deferred_only_for_standby() {
                     .iter()
                     .map(|installation| installation.templatable_mcp_server().name.as_str())
                     .collect::<Vec<_>>(),
-                [FACTORY_MCP_SERVER_NAME]
+                expected_names
             );
         }
     });
