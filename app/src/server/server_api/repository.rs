@@ -20,6 +20,7 @@ pub struct ResolvedRepository {
 
 impl ResolvedRepository {
     /// Returns the logical repository identity rather than an alternate clone source.
+    #[cfg_attr(target_family = "wasm", expect(dead_code))]
     pub(crate) fn source_repo(&self) -> SourceRepo {
         SourceRepo::new(self.forge, self.owner.clone(), self.name.clone())
     }
