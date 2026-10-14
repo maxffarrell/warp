@@ -97,7 +97,7 @@ async fn prepare_and_wait(
     let setup_events = foreground
         .spawn(|_, ctx| {
             let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client().clone();
-            SetupClientEventReporter::noop(ai_client, ctx.background_executor())
+            SetupClientEventReporter::standby(ai_client, ctx.background_executor())
         })
         .await?;
 

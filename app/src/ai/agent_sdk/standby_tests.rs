@@ -18,7 +18,7 @@ fn invalid_preparation_inputs_fail_before_driver_creation_or_metadata_access() {
     App::test((), |mut app| async move {
         let runner = app.add_singleton_model(|_| AgentDriverRunner);
         let foreground = runner.update(&mut app, |_, ctx| ctx.spawner());
-        let setup_events = SetupClientEventReporter::noop(
+        let setup_events = SetupClientEventReporter::standby(
             Arc::new(MockAIClient::new()),
             app.background_executor(),
         );
@@ -57,7 +57,7 @@ fn skill_checkout_collisions_fail_before_cloning_or_metadata_access() {
     App::test((), |mut app| async move {
         let runner = app.add_singleton_model(|_| AgentDriverRunner);
         let foreground = runner.update(&mut app, |_, ctx| ctx.spawner());
-        let setup_events = SetupClientEventReporter::noop(
+        let setup_events = SetupClientEventReporter::standby(
             Arc::new(MockAIClient::new()),
             app.background_executor(),
         );
@@ -89,7 +89,7 @@ fn global_skill_checkout_collisions_fail_before_cloning_or_metadata_access() {
         app.add_singleton_model(|_| AuthStateProvider::new_for_test());
         let runner = app.add_singleton_model(|_| AgentDriverRunner);
         let foreground = runner.update(&mut app, |_, ctx| ctx.spawner());
-        let setup_events = SetupClientEventReporter::noop(
+        let setup_events = SetupClientEventReporter::standby(
             Arc::new(MockAIClient::new()),
             app.background_executor(),
         );

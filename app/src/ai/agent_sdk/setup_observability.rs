@@ -10,10 +10,12 @@ use warpui::r#async::executor::Background;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::server::server_api::ai::{AIClient, AgentRunClientEventRequest};
 
-/// Records setup spans and sends best-effort server events only when a run ID exists.
+/// Records setup spans and optional run events, with an agent-only scope for standby.
 #[derive(Clone)]
 pub(crate) struct SetupClientEventReporter {
     run_id: Option<AmbientAgentTaskId>,
+    /// Keeps execution scope separate from the run ID that controls event reporting.
+    scope: SetupScope,
     ai_client: Arc<dyn AIClient>,
     background: Arc<Background>,
 }
@@ -27,6 +29,7 @@ impl SetupClientEventReporter {
     ) -> Self {
         Self {
             run_id: Some(run_id),
+            scope: SetupScope::Run,
             ai_client,
             background,
         }
@@ -36,9 +39,27 @@ impl SetupClientEventReporter {
     pub(crate) fn noop(ai_client: Arc<dyn AIClient>, background: Arc<Background>) -> Self {
         Self {
             run_id: None,
+            scope: SetupScope::Run,
             ai_client,
             background,
         }
+    }
+
+    /// Restricts setup to agent-scoped steps and disables run event reporting.
+    #[cfg_attr(all(target_family = "wasm", not(test)), expect(dead_code))]
+    pub(crate) fn standby(ai_client: Arc<dyn AIClient>, background: Arc<Background>) -> Self {
+        Self {
+            scope: SetupScope::Agent,
+            ..Self::noop(ai_client, background)
+        }
+    }
+
+    fn start_step(&self, step: SetupStep) -> (&'static str, tracing::Span) {
+        assert!(
+            self.scope == SetupScope::Run || step.scope() == SetupScope::Agent,
+            "Run-scoped setup step {step:?} cannot run during standby preparation",
+        );
+        step.to_event_name_and_span()
     }
 
     /// Records a setup step's duration and error state without changing its result.
@@ -47,7 +68,7 @@ impl SetupClientEventReporter {
         step: SetupStep,
         future: impl Future<Output = Result<T, E>>,
     ) -> Result<T, E> {
-        let (step_name, span) = step.to_event_name_and_span();
+        let (step_name, span) = self.start_step(step);
 
         let start_timestamp = Utc::now();
         let result = future
@@ -75,7 +96,7 @@ impl SetupClientEventReporter {
         step: SetupStep,
         future: impl Future<Output = T>,
     ) -> T {
-        let (step_name, span) = step.to_event_name_and_span();
+        let (step_name, span) = self.start_step(step);
 
         let start_timestamp = Utc::now();
         let value = future.instrument(span).await;
@@ -97,7 +118,7 @@ impl SetupClientEventReporter {
     ) where
         T: Send + 'static,
     {
-        let (step_name, span) = step.to_event_name_and_span();
+        let (step_name, span) = self.start_step(step);
 
         let reporter = self.clone();
         self.background
@@ -184,7 +205,7 @@ impl OzRunTimelineEvent {
     }
 }
 
-/// Classifies setup requirements without controlling which steps standby preparation executes.
+/// Identifies which setup steps standby may execute before a run exists.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SetupScope {
     /// Inputs are limited to team, agent service account, agent config snapshot,

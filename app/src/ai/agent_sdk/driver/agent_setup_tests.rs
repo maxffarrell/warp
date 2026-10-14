@@ -76,7 +76,7 @@ fn resource_preparation_rejects_a_consumed_workspace() {
             driver.workspace = None;
             ctx.spawner()
         });
-        let setup_events = SetupClientEventReporter::noop(
+        let setup_events = SetupClientEventReporter::standby(
             Arc::new(MockAIClient::new()),
             app.background_executor(),
         );
@@ -118,7 +118,7 @@ fn configured_skills_load_without_environment_or_global_repositories() {
             AgentDriver::new_for_test(working_dir.clone(), terminal_driver, ctx)
         });
         let foreground = driver.update(&mut app, |_, ctx| ctx.spawner());
-        let setup_events = SetupClientEventReporter::noop(
+        let setup_events = SetupClientEventReporter::standby(
             Arc::new(MockAIClient::new()),
             app.background_executor(),
         );
